@@ -11,6 +11,7 @@ import torch.optim as optim
 import torch.backends.cudnn as cudnn
 import argparse
 import torch.utils.data as data
+from pathlib import Path
 from blazeface.data.dataset.wider_face import WiderFaceDetection, detection_collate
 from blazeface.data.transform.data_augment import preproc
 from config import cfg_mnet, cfg_slim, cfg_rfb, cfg_blaze
@@ -29,21 +30,32 @@ from blazeface.models.net_blaze import Blaze
 from blazeface.utils.data_loader import data_prefetcher, FastDataLoader
 import logging
 
+from rich.traceback import install
+
+install()
+
 LOG_FORMAT = "%(asctime)s %(levelname)s : %(message)s"
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
 
-parser = argparse.ArgumentParser(description='Training')
-parser.add_argument('--training_dataset', default='/data/face_detections/face_dataset/widerface/train/label.txt', help='Training dataset directory')
+parser = argparse.ArgumentParser(
+    description="Training",
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+)
+# parser = argparse.ArgumentParser(description='Training')
+parser.add_argument('--training_dataset', default='./data/widerface/train/label.txt', help='Training dataset directory')
 parser.add_argument('--network', default='Blaze', help='Backbone network mobile0.25 or slim or RFB')
-parser.add_argument('--num_workers', default=8, type=int, help='Number of workers used in dataloading')
+parser.add_argument('--num_workers', default=4, type=int, help='Number of workers used in dataloading')
 parser.add_argument('--lr', '--learning-rate', default=1e-3, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0, type=float, help='momentum')
 parser.add_argument('--resume_net', default=None, help='resume net for retraining')
 parser.add_argument('--resume_epoch', default=0, type=int, help='resume iter for retraining')
 parser.add_argument('--weight_decay', default=5e-4, type=float, help='Weight decay for SGD')
 parser.add_argument('--gamma', default=0.1, type=float, help='Gamma update for SGD')
-parser.add_argument('--save_folder', default='/data/face_detections/blazefacev3/weights/train/', help='Location to save checkpoint models')
+parser.add_argument('--save_folder', default='./weights/', help='Location to save checkpoint models')
+# parser.add_argument("--exp_suffix", default="", type=str, help="Suffix for exp name")
+parser.add_argument("--pad_images", default=True, type=bool, help="Pad images?")
+parser.add_argument("--epochs", default=20, type=int, help="Num. training epochs")
 
 args = parser.parse_args()
 
@@ -68,15 +80,22 @@ else:
     print("Don't support network!")
     exit(0)
 
-print("Printing net...")
-print(net)
+
+cfg["name"] = f'{cfg["name"]}__Img-Size-{cfg["image_size"]}__Pad-{str(args.pad_images)}__{args.epochs}-Epochs'
+# cfg["name"] = cfg["name"] + "_" + args.exp_suffix
+save_folder = Path(args.save_folder) / cfg["name"]
+save_folder.mkdir(exist_ok=True, parents=True)
+
+
+# print("Printing net...")
+# print(net)
 
 rgb_mean = (104, 117, 123) # bgr order
 num_classes = 2
 img_dim = cfg['image_size']
 num_gpu = cfg['ngpu']
 batch_size = cfg['batch_size']
-max_epoch = cfg['epoch']
+max_epoch = args.epochs #cfg['epoch']
 gpu_train = cfg['gpu_train']
 
 num_workers = args.num_workers
@@ -85,7 +104,6 @@ weight_decay = args.weight_decay
 initial_lr = args.lr
 gamma = args.gamma
 training_dataset = args.training_dataset
-save_folder = args.save_folder
 
 if args.resume_net is not None:
     logging.info('Loading resume network...')
@@ -131,7 +149,7 @@ def train():
     epoch = 0 + args.resume_epoch
     logging.info('Loading Dataset...')
 
-    dataset = WiderFaceDetection(training_dataset,preproc(img_dim, rgb_mean))
+    dataset = WiderFaceDetection(training_dataset,preproc(img_dim, rgb_mean, args.pad_images))
 
     epoch_size = math.ceil(len(dataset) / batch_size)
     max_iter = max_epoch * epoch_size
