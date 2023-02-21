@@ -3,8 +3,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-from utils.box_utils import match, log_sum_exp
-from utils.box_utils import match_gious, bbox_overlaps_giou, decode
+from ...utils.box_utils import match_gious, bbox_overlaps_giou, decode
+# from utils.box_utils import match, log_sum_exp
+# from utils.box_utils import match_gious, bbox_overlaps_giou, decode
 
 
 class FocalLoss(nn.Module):

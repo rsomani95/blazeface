@@ -1,7 +1,8 @@
 import cv2
 import numpy as np
 import random
-from utils.box_utils import matrix_iof, letterbox
+# from utils.box_utils import matrix_iof, letterbox
+from ...utils.box_utils import matrix_iof, letterbox
 
 # Prevent OpenCV from multithreading (to use PyTorch DataLoader)
 cv2.setNumThreads(0)
@@ -213,9 +214,10 @@ def _resize_subtract_mean(image, insize, rgb_mean):
 
 class preproc(object):
 
-    def __init__(self, img_dim, rgb_means):
+    def __init__(self, img_dim, rgb_means, pad_images):
         self.img_dim = img_dim
         self.rgb_means = rgb_means
+        self.pad_images = pad_images
 
     def __call__(self, image, targets):
         assert targets.shape[0] > 0, "this image does not have gt"
@@ -226,7 +228,10 @@ class preproc(object):
 
         image_t, boxes_t, labels_t, landm_t, pad_image_flag = _crop(image, boxes, labels, landm, self.img_dim)
         image_t = _distort(image_t)
-        image_t = _pad_to_square(image_t,self.rgb_means, pad_image_flag)
+
+        if self.pad_images:
+            image_t = _pad_to_square(image_t,self.rgb_means, pad_image_flag)
+
         image_t, boxes_t, landm_t = _mirror(image_t, boxes_t, landm_t)
         height, width, _ = image_t.shape
         image_t = _resize_subtract_mean(image_t, self.img_dim, self.rgb_means)
