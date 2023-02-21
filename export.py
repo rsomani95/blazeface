@@ -10,15 +10,15 @@ import torch
 import torch.backends.cudnn as cudnn
 import numpy as np
 from config import cfg_mnet, cfg_slim, cfg_rfb, cfg_blaze
-from models.module.prior_box import PriorBox
-from models.module.py_cpu_nms import py_cpu_nms
+from blazeface.models.module.prior_box import PriorBox
+from blazeface.models.module.py_cpu_nms import py_cpu_nms
 import cv2
-from models.retinaface import RetinaFace
-from models.net_slim import Slim
-from models.net_rfb import RFB
-from models.net_blaze import Blaze
-from utils.box_utils import decode, decode_landm
-from utils.timer import Timer
+from blazeface.models.retinaface import RetinaFace
+from blazeface.models.net_slim import Slim
+from blazeface.models.net_rfb import RFB
+from blazeface.models.net_blaze import Blaze
+from blazeface.utils.box_utils import decode, decode_landm
+from blazeface.utils.timer import Timer
 
 
 parser = argparse.ArgumentParser(description='Test')

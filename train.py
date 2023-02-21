@@ -11,22 +11,22 @@ import torch.optim as optim
 import torch.backends.cudnn as cudnn
 import argparse
 import torch.utils.data as data
-from data.dataset.wider_face import WiderFaceDetection, detection_collate
-from data.transform.data_augment import preproc
+from blazeface.data.dataset.wider_face import WiderFaceDetection, detection_collate
+from blazeface.data.transform.data_augment import preproc
 from config import cfg_mnet, cfg_slim, cfg_rfb, cfg_blaze
-from models.loss import MultiBoxLoss
-from models.loss.custom_loss import MultiBoxLoss as CustomLoss
-from models.loss.custom_loss2 import MultiBoxLoss as CustomLoss2
-from models.module.prior_box import PriorBox
-from apex import amp
+from blazeface.models.loss import MultiBoxLoss
+from blazeface.models.loss.custom_loss import MultiBoxLoss as CustomLoss
+from blazeface.models.loss.custom_loss2 import MultiBoxLoss as CustomLoss2
+from blazeface.models.module.prior_box import PriorBox
+# from apex import amp
 import time
 import datetime
 import math
-from models.retinaface import RetinaFace
-from models.net_slim import Slim
-from models.net_rfb import RFB
-from models.net_blaze import Blaze
-from utils.data_loader import data_prefetcher, FastDataLoader
+from blazeface.models.retinaface import RetinaFace
+from blazeface.models.net_slim import Slim
+from blazeface.models.net_rfb import RFB
+from blazeface.models.net_blaze import Blaze
+from blazeface.utils.data_loader import data_prefetcher, FastDataLoader
 import logging
 
 LOG_FORMAT = "%(asctime)s %(levelname)s : %(message)s"

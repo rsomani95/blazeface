@@ -148,3 +148,8 @@ nohup.out
 # weights
 weights/train
 blazeface/evaluator/widerface_evaluate/widerface_txt
+widerface_evaluate/widerface_txt/*
+data/widerface*
+weights/*
+data/FDDB
+widerface_evaluate/*

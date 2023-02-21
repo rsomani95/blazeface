@@ -9,16 +9,17 @@ import argparse
 import torch
 import torch.backends.cudnn as cudnn
 import numpy as np
+import time
 from config import cfg_mnet, cfg_slim, cfg_rfb, cfg_blaze
-from models.module.prior_box import PriorBox
-from models.module.py_cpu_nms import py_cpu_nms
+from blazeface.models.module.prior_box import PriorBox
+from blazeface.models.module.py_cpu_nms import py_cpu_nms
 import cv2
-from models.retinaface import RetinaFace
-from models.net_slim import Slim
-from models.net_rfb import RFB
-from models.net_blaze import Blaze
-from utils.box_utils import decode, decode_landm
-from utils.timer import Timer
+from blazeface.models.retinaface import RetinaFace
+from blazeface.models.net_slim import Slim
+from blazeface.models.net_rfb import RFB
+from blazeface.models.net_blaze import Blaze
+from blazeface.utils.box_utils import decode, decode_landm, letterbox
+from blazeface.utils.timer import Timer
 
 
 parser = argparse.ArgumentParser(description='Test')
@@ -26,16 +27,15 @@ parser.add_argument('-m', '--trained_model', default='/data/face_detections/blaz
                     type=str, help='Trained state_dict file path to open')
 parser.add_argument('--network', default='Blaze', help='Backbone network mobile0.25 or slim or RFB')
 parser.add_argument('--origin_size', default=False, type=str, help='Whether use origin image size to evaluate')
-parser.add_argument('--long_side', default=320, help='when origin_size is false, long_side is scaled size(320 or 640 for long side)')
-parser.add_argument('--save_folder', default='/data/face_detections/blazefacev3/blazeface/evaluator/widerface_evaluate/widerface_txt', type=str, help='Dir to save txt results')
+parser.add_argument('--long_side', default=1280, help='when origin_size is false, long_side is scaled size(320 or 640 for long side)')
+parser.add_argument('--save_folder', default='./widerface_evaluate/widerface_txt/', type=str, help='Dir to save txt results')
 parser.add_argument('--cpu', action="store_true", default=False, help='Use cpu inference')
-parser.add_argument('--dataset_folder', default='/data/face_detections/face_dataset/widerface/val/images/', type=str, help='dataset path')
-parser.add_argument('--confidence_threshold', default=0.01, type=float, help='confidence_threshold')
+parser.add_argument('--confidence_threshold', default=0.3, type=float, help='confidence_threshold')
 parser.add_argument('--top_k', default=2000, type=int, help='top_k')
-parser.add_argument('--nms_threshold', default=0.5, type=float, help='nms_threshold')
+parser.add_argument('--nms_threshold', default=0.1, type=float, help='nms_threshold')
 parser.add_argument('--keep_top_k', default=1000, type=int, help='keep_top_k')
-parser.add_argument('-s', '--save_image', action="store_true", default=False, help='show detection results')
-parser.add_argument('--vis_thres', default=0.17, type=float, help='visualization_threshold')
+parser.add_argument('--save_image', action="store_true", default=True, help='show detection results')
+parser.add_argument('--vis_thres', default=0.3, type=float, help='visualization_threshold')
 args = parser.parse_args()
 
 
@@ -104,38 +104,29 @@ if __name__ == '__main__':
     device = torch.device("cpu" if args.cpu else "cuda")
     net = net.to(device)
 
-    # testing dataset
-    testset_folder = args.dataset_folder
-    testset_list = args.dataset_folder[:-7] + "wider_val.txt"
-
-    with open(testset_list, 'r') as fr:
-        test_dataset = fr.read().split()
-    num_images = len(test_dataset)
-
-    _t = {'forward_pass': Timer(), 'misc': Timer()}
-
     # testing begin
-    for i, img_name in enumerate(test_dataset):
-        image_path = testset_folder + img_name
+    for i in range(1):
+        image_path = "/data/face_detections/blazefacev3/docs/img/sample1.jpg"
+
         img_raw = cv2.imread(image_path, cv2.IMREAD_COLOR)
         img = np.float32(img_raw)
 
         # testing scale
         target_size = args.long_side
         max_size = args.long_side
+
         im_shape = img.shape
         im_size_min = np.min(im_shape[0:2])
         im_size_max = np.max(im_shape[0:2])
-        
-        #blazeface resize
-        height, width, _ = im_shape
-        image_t = np.empty((im_size_max, im_size_max, 3), dtype=img.dtype)
-        image_t[:, :] = (104, 117, 123)
-        image_t[0:0 + height, 0:0 + width] = img
-        img = cv2.resize(image_t, (max_size, max_size))
-        resize = float(target_size) / float(im_size_max)
 
-            
+        if args.origin_size:
+            target_size = cfg["image_size"]
+
+        # yolo resize
+        img, ratio, (dw, dh) = letterbox(img, (target_size, target_size), color=(104, 117, 123), auto=True, scaleFill=False)
+        resize = np.max(ratio)
+        print(f"IMAGE SHAPE: {img.shape}")
+
         im_height, im_width, _ = img.shape
         scale = torch.Tensor([img.shape[1], img.shape[0], img.shape[1], img.shape[0]])
         img -= (104, 117, 123)
@@ -144,19 +135,17 @@ if __name__ == '__main__':
         img = img.to(device)
         scale = scale.to(device)
 
-        _t['forward_pass'].tic()
+        tic = time.time()
         loc, conf, landms = net(img)  # forward pass
-        _t['forward_pass'].toc()
-        _t['misc'].tic()
+        print('net forward time: {:.4f}'.format(time.time() - tic))
+
         priorbox = PriorBox(cfg, image_size=(im_height, im_width))
         priors = priorbox.forward()
         priors = priors.to(device)
         prior_data = priors.data
         boxes = decode(loc.data.squeeze(0), prior_data, cfg['variance'])
-        boxes = boxes.clamp(max=1, min=0.00001)
         boxes = boxes * scale / resize
         boxes = boxes.cpu().numpy()
-        boxes = np.nan_to_num(boxes)
         scores = conf.squeeze(0).data.cpu().numpy()[:, 1]
         landms = decode_landm(landms.data.squeeze(0), prior_data, cfg['variance'])
         scale1 = torch.Tensor([img.shape[3], img.shape[2], img.shape[3], img.shape[2],
@@ -173,8 +162,7 @@ if __name__ == '__main__':
         scores = scores[inds]
 
         # keep top-K before NMS
-        order = scores.argsort()[::-1]
-        # order = scores.argsort()[::-1][:args.top_k]
+        order = scores.argsort()[::-1][:args.top_k]
         boxes = boxes[order]
         landms = landms[order]
         scores = scores[order]
@@ -187,40 +175,21 @@ if __name__ == '__main__':
         landms = landms[keep]
 
         # keep top-K faster NMS
-        # dets = dets[:args.keep_top_k, :]
-        # landms = landms[:args.keep_top_k, :]
+        dets = dets[:args.keep_top_k, :]
+        landms = landms[:args.keep_top_k, :]
 
         dets = np.concatenate((dets, landms), axis=1)
-        _t['misc'].toc()
 
-        # --------------------------------------------------------------------
-        save_name = args.save_folder + img_name[:-4] + ".txt"
-        dirname = os.path.dirname(save_name)
-        if not os.path.isdir(dirname):
-            os.makedirs(dirname)
-        with open(save_name, "w") as fd:
-            bboxs = dets
-            file_name = os.path.basename(save_name)[:-4] + "\n"
-            bboxs_num = str(len(bboxs)) + "\n"
-            fd.write(file_name)
-            fd.write(bboxs_num)
-            for box in bboxs:
-                x = int(box[0])
-                y = int(box[1])
-                w = int(box[2]) - int(box[0])
-                h = int(box[3]) - int(box[1])
-                confidence = str(box[4])
-                line = str(x) + " " + str(y) + " " + str(w) + " " + str(h) + " " + confidence + " \n"
-                fd.write(line)
+        face_det_list = []
 
-        print('im_detect: {:d}/{:d} forward_pass_time: {:.4f}s misc: {:.4f}s'.format(i + 1, num_images, _t['forward_pass'].average_time, _t['misc'].average_time))
-
-        # save image
+        # show image
         if args.save_image:
             for b in dets:
                 if b[4] < args.vis_thres:
                     continue
+                face_det_list.append(b)
                 text = "{:.4f}".format(b[4])
+                # b = list(map(lambda x:int(round(x, 0)), b))
                 b = list(map(int, b))
                 cv2.rectangle(img_raw, (b[0], b[1]), (b[2], b[3]), (0, 0, 255), 2)
                 cx = b[0]
@@ -235,8 +204,9 @@ if __name__ == '__main__':
                 cv2.circle(img_raw, (b[11], b[12]), 1, (0, 255, 0), 4)
                 cv2.circle(img_raw, (b[13], b[14]), 1, (255, 0, 0), 4)
             # save image
-            if not os.path.exists("./results/"):
-                os.makedirs("./results/")
-            name = "./results/" + str(i) + ".jpg"
-            cv2.imwrite(name, img_raw)
+
+            print("face num:", len(face_det_list))
+            name = "test1.jpg"
+            infer_image_path = os.path.join(os.path.split(image_path)[0], name)
+            cv2.imwrite(infer_image_path, img_raw)
 
