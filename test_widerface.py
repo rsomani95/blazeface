@@ -180,7 +180,7 @@ if __name__ == '__main__':
         # img -= (104, 117, 123)  # BGR order
         img = BGR_to_RGB(img)
         img -= (123, 117, 104)  # RGB order
-        # img /= (57, 57, 58) # bgr order
+        img /= (58, 57, 57) # BGR order
         img = img.transpose(2, 0, 1)
 
         # New

@@ -292,10 +292,10 @@ class preproc(object):
 
         # Old
         image_t = BGR_to_RGB(image_t)
-        image_t = _resize_subtract_mean(image_t, self.img_dim, self.rgb_means)
+        # image_t = _resize_subtract_mean(image_t, self.img_dim, self.rgb_means)
 
         # New - simpler steps...
-        # image_t = _resize_subtract_mean_div_std(image_t, self.img_dim, self.rgb_means, self.rgb_std)
+        image_t = _resize_subtract_mean_div_std(image_t, self.img_dim, self.rgb_means, self.rgb_std)
 
         # New, where we break down the resize + normalisation into explicit steps
         # image_t = resize_cv2(image, (self.img_dim, self.img_dim))
