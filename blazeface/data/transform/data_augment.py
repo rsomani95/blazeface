@@ -291,6 +291,7 @@ class preproc(object):
         height, width, _ = image_t.shape
 
         # Old
+        image_t = BGR_to_RGB(image_t)
         image_t = _resize_subtract_mean(image_t, self.img_dim, self.rgb_means)
 
         # New - simpler steps...

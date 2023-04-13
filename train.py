@@ -54,7 +54,7 @@ parser.add_argument('--weight_decay', default=5e-4, type=float, help='Weight dec
 parser.add_argument('--gamma', default=0.1, type=float, help='Gamma update for SGD')
 parser.add_argument('--save_folder', default='./weights/', help='Location to save checkpoint models')
 # parser.add_argument("--exp_suffix", default="", type=str, help="Suffix for exp name")
-parser.add_argument("--epochs", default=20, type=int, help="Num. training epochs")
+parser.add_argument("--epochs", default=10, type=int, help="Num. training epochs")
 parser.add_argument("--batch_size", default=128, type=int, help="Batch size")
 # parser.add_argument("--pad_images", default=True, type=bool, help="Pad images?")
 parser.add_argument('--pad_images', dest='pad_images', action='store_true')
@@ -99,11 +99,11 @@ rich.print(f"Pad Images? : {args.pad_images}")
 # print("Printing net...")
 # print(net)
 
-rgb_mean = (104, 117, 123) # bgr order
-rgb_std = (57, 57, 58) # bgr order
+# rgb_mean = (104, 117, 123) # bgr order
+# rgb_std = (57, 57, 58) # bgr order
 
-# rgb_mean = (123, 117, 104) # rgb order
-# rgb_std = (58, 57, 57) # rgb order
+rgb_mean = (123, 117, 104) # rgb order
+rgb_std = (58, 57, 57) # rgb order
 
 # rgb_mean = IMAGENET_MEAN
 # rgb_std = IMAGENET_STD

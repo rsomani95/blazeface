@@ -14,6 +14,7 @@ from config import cfg_mnet, cfg_slim, cfg_rfb, cfg_blaze
 from blazeface.models.module.prior_box import PriorBox
 from blazeface.models.module.py_cpu_nms import py_cpu_nms
 import cv2
+from blazeface.data.transform.data_augment import BGR_to_RGB
 from pathlib import Path
 from blazeface.models.retinaface import RetinaFace
 from blazeface.models.net_slim import Slim
@@ -176,7 +177,9 @@ if __name__ == '__main__':
         scale = torch.Tensor([img.shape[1], img.shape[0], img.shape[1], img.shape[0]])
 
         # Old
-        img -= (104, 117, 123)
+        # img -= (104, 117, 123)  # BGR order
+        img = BGR_to_RGB(img)
+        img -= (123, 117, 104)  # RGB order
         # img /= (57, 57, 58) # bgr order
         img = img.transpose(2, 0, 1)
 
