@@ -99,3 +99,29 @@ def detection_collate(batch):
                 targets.append(annos)
 
     return (torch.stack(imgs, 0), targets)
+
+
+
+from upyog.all import *
+
+class CineWiderFace(WiderFaceDetection):
+    def __init__(self, df_path: PathLike, preproc=None):
+        self.preproc = preproc
+        self.df = pd.read_feather(df_path)
+        assert "data" in self.df.columns
+
+        self.df["data"] = self.df["data"].apply(np.stack)
+
+    def __getitem__(self, index) -> Tuple[torch.Tensor, np.ndarray]:
+        row = self.df.iloc[index]
+
+        img = cv2.imread(row["filepath"])
+        target = row["data"]
+
+        if self.preproc is not None:
+            img, target = self.preproc(img, target)
+
+        return torch.from_numpy(img), target
+
+    def __len__(self):
+        return len(self.df)

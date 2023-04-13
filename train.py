@@ -13,7 +13,7 @@ import argparse
 import torch.utils.data as data
 from pathlib import Path
 from blazeface.data.dataset.wider_face import WiderFaceDetection, detection_collate
-from blazeface.data.transform.data_augment import preproc
+from blazeface.data.transform.data_augment import preproc, IMAGENET_MEAN, IMAGENET_STD
 from config import cfg_mnet, cfg_slim, cfg_rfb, cfg_blaze
 from blazeface.models.loss import MultiBoxLoss
 from blazeface.models.loss.custom_loss import MultiBoxLoss as CustomLoss
@@ -45,7 +45,7 @@ parser = argparse.ArgumentParser(
 # parser = argparse.ArgumentParser(description='Training')
 parser.add_argument('--training_dataset', default='./data/widerface/train/label.txt', help='Training dataset directory')
 parser.add_argument('--network', default='Blaze', help='Backbone network mobile0.25 or slim or RFB')
-parser.add_argument('--num_workers', default=4, type=int, help='Number of workers used in dataloading')
+parser.add_argument('--num_workers', default=2, type=int, help='Number of workers used in dataloading')
 parser.add_argument('--lr', '--learning-rate', default=1e-3, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0, type=float, help='momentum')
 parser.add_argument('--resume_net', default=None, help='resume net for retraining')
@@ -54,8 +54,12 @@ parser.add_argument('--weight_decay', default=5e-4, type=float, help='Weight dec
 parser.add_argument('--gamma', default=0.1, type=float, help='Gamma update for SGD')
 parser.add_argument('--save_folder', default='./weights/', help='Location to save checkpoint models')
 # parser.add_argument("--exp_suffix", default="", type=str, help="Suffix for exp name")
-parser.add_argument("--pad_images", default=True, type=bool, help="Pad images?")
 parser.add_argument("--epochs", default=20, type=int, help="Num. training epochs")
+parser.add_argument("--batch_size", default=128, type=int, help="Batch size")
+# parser.add_argument("--pad_images", default=True, type=bool, help="Pad images?")
+parser.add_argument('--pad_images', dest='pad_images', action='store_true')
+parser.add_argument('--no_pad_images', dest='pad_images', action='store_false')
+parser.set_defaults(pad_images=True)
 
 args = parser.parse_args()
 
@@ -81,16 +85,28 @@ else:
     exit(0)
 
 
+import rich
+rich.print(args)
+
 cfg["name"] = f'{cfg["name"]}__Img-Size-{cfg["image_size"]}__Pad-{str(args.pad_images)}__{args.epochs}-Epochs'
 # cfg["name"] = cfg["name"] + "_" + args.exp_suffix
 save_folder = Path(args.save_folder) / cfg["name"]
 save_folder.mkdir(exist_ok=True, parents=True)
+# save_folder = str(save_folder)
 
+rich.print(f"Pad Images? : {args.pad_images}")
 
 # print("Printing net...")
 # print(net)
 
 rgb_mean = (104, 117, 123) # bgr order
+rgb_std = (57, 57, 58) # bgr order
+
+# rgb_mean = (123, 117, 104) # rgb order
+# rgb_std = (58, 57, 57) # rgb order
+
+# rgb_mean = IMAGENET_MEAN
+# rgb_std = IMAGENET_STD
 num_classes = 2
 img_dim = cfg['image_size']
 num_gpu = cfg['ngpu']
@@ -120,8 +136,10 @@ if args.resume_net is not None:
         new_state_dict[name] = v
     net.load_state_dict(new_state_dict)
 
-if num_gpu >= 1 and gpu_train:
+if num_gpu > 1 and gpu_train:
     net = torch.nn.DataParallel(net).cuda()
+    print("!!" * 100)
+    print("DATA PARALLEL WTF")
 
 else:
     net = net.cuda()
@@ -149,7 +167,8 @@ def train():
     epoch = 0 + args.resume_epoch
     logging.info('Loading Dataset...')
 
-    dataset = WiderFaceDetection(training_dataset,preproc(img_dim, rgb_mean, args.pad_images))
+    # dataset = WiderFaceDetection(training_dataset,preproc(img_dim, rgb_mean, args.pad_images))
+    dataset = WiderFaceDetection(training_dataset,preproc(img_dim, rgb_mean, rgb_std, args.pad_images))
 
     epoch_size = math.ceil(len(dataset) / batch_size)
     max_iter = max_epoch * epoch_size
@@ -181,7 +200,8 @@ def train():
             batch_iterator = data_prefetcher(loader, device)
             # batch_iterator = iter(loader)
             if (epoch % 10 == 0 and epoch > 0) or (epoch % 5 == 0 and epoch > cfg['decay1']):
-                torch.save(net.state_dict(), save_folder + cfg['name']+ '_epoch_' + str(epoch) + '.pth')
+                torch.save(net.state_dict(), str(save_folder / f"{cfg['name']}_epoch_{epoch}.pth"))
+                # torch.save(net.state_dict(), save_folder + cfg['name']+ '_epoch_' + str(epoch) + '.pth')
             epoch += 1
 
         load_t0 = time.time()
@@ -220,7 +240,8 @@ def train():
               .format(epoch, max_epoch, (iteration % epoch_size) + 1,
               epoch_size, iteration + 1, max_iter, loss_l.item(), loss_c.item(), loss_landm.item(), lr, batch_time, str(datetime.timedelta(seconds=eta))))
 
-    torch.save(net.state_dict(), save_folder + cfg['name'] + '_Final.pth')
+    torch.save(net.state_dict(), str(save_folder / f"{cfg['name']}_Final.pth"))
+    # torch.save(net.state_dict(), save_folder + cfg['name'] + '_Final.pth')
 
 def adjust_learning_rate(optimizer, gamma, epoch, step_index, iteration, epoch_size):
     """Sets the learning rate

@@ -74,7 +74,7 @@ cfg_blaze = {
     'decay2': 160,
     'decay3': 175,
     'decay4': 185,
-    'image_size': 320,
+    'image_size': 256,
     'num_classes':2
 }
 

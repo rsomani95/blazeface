@@ -4,6 +4,7 @@ import sys
 sys.path.append("/data/face_detections/blazefacev3/config")
 sys.path.append("/data/face_detections/blazefacev3/blazeface")
 
+import rich
 import os
 import argparse
 import torch
@@ -13,6 +14,7 @@ from config import cfg_mnet, cfg_slim, cfg_rfb, cfg_blaze
 from blazeface.models.module.prior_box import PriorBox
 from blazeface.models.module.py_cpu_nms import py_cpu_nms
 import cv2
+from pathlib import Path
 from blazeface.models.retinaface import RetinaFace
 from blazeface.models.net_slim import Slim
 from blazeface.models.net_rfb import RFB
@@ -28,17 +30,20 @@ parser = argparse.ArgumentParser(description='Test')
 parser.add_argument('-m', '--trained_model', default='/data/face_detections/blazefacev3/weights/pretrain/Blaze_Final_640.pth',
                     type=str, help='Trained state_dict file path to open')
 parser.add_argument('--network', default='Blaze', help='Backbone network mobile0.25 or slim or RFB')
-parser.add_argument('--origin_size', default=False, type=str, help='Whether use origin image size to evaluate')
-parser.add_argument('--long_side', default=320, help='when origin_size is false, long_side is scaled size(320 or 640 for long side)')
-parser.add_argument('--save_folder', default='/data/face_detections/blazefacev3/blazeface/evaluator/widerface_evaluate/widerface_txt', type=str, help='Dir to save txt results')
+parser.add_argument('--origin_size', default=False, action='store_true', help='Whether use origin image size to evaluate')
+parser.add_argument('--long_side', default=256, help='when origin_size is false, long_side is scaled size(320 or 640 for long side)')
+parser.add_argument('--save_folder', default='./widerface_evaluate/widerface_txt', type=str, help='Dir to save txt results')
 parser.add_argument('--cpu', action="store_true", default=False, help='Use cpu inference')
-parser.add_argument('--dataset_folder', default='/data/face_detections/face_dataset/widerface/val/images/', type=str, help='dataset path')
+parser.add_argument('--dataset_folder', default='./data/widerface/val/images/', type=str, help='dataset path')
 parser.add_argument('--confidence_threshold', default=0.01, type=float, help='confidence_threshold')
 parser.add_argument('--top_k', default=2000, type=int, help='top_k')
 parser.add_argument('--nms_threshold', default=0.5, type=float, help='nms_threshold')
 parser.add_argument('--keep_top_k', default=1000, type=int, help='keep_top_k')
 parser.add_argument('-s', '--save_image', action="store_true", default=False, help='show detection results')
 parser.add_argument('--vis_thres', default=0.17, type=float, help='visualization_threshold')
+parser.add_argument('--pad_images', dest='pad_images', action='store_true')
+parser.add_argument('--no_pad_images', dest='pad_images', action='store_false')
+parser.set_defaults(pad_images=True)
 args = parser.parse_args()
 
 
@@ -99,6 +104,17 @@ if __name__ == '__main__':
         print("Don't support network!")
         exit(0)
 
+
+    rich.print(f"ARGS: \n{args}")
+
+
+    save_folder = Path(args.save_folder)
+    if save_folder.exists():
+        import shutil
+
+        shutil.rmtree(save_folder)
+        print(f"Deleted existing predictions")
+
     net = load_model(net, args.trained_model, args.cpu)
     net.eval()
     print('Finished loading model!')
@@ -132,22 +148,44 @@ if __name__ == '__main__':
         im_size_min = np.min(im_shape[0:2])
         im_size_max = np.max(im_shape[0:2])
 
-        if args.origin_size:
-            im_size_min = im_shape_max = target_size = max_size = cfg["image_size"]
+        # if args.origin_size:
+        #     print("USING ORIGIN SIZE!!")
+        #     im_size_min = im_shape_max = target_size = max_size = cfg["image_size"]
         
         #blazeface resize
         height, width, _ = im_shape
-        image_t = np.empty((im_size_max, im_size_max, 3), dtype=img.dtype)
-        image_t[:, :] = (104, 117, 123)
-        image_t[0:0 + height, 0:0 + width] = img
-        img = cv2.resize(image_t, (max_size, max_size))
+
+        if args.pad_images:
+            image_t = np.empty((im_size_max, im_size_max, 3), dtype=img.dtype)
+            image_t[:, :] = (104, 117, 123)
+            image_t[0:0 + height, 0:0 + width] = img
+            img = cv2.resize(image_t, (max_size, max_size))
+        else:
+            img = cv2.resize(img, (max_size, max_size))
+
         resize = float(target_size) / float(im_size_max)
+
+        # from PIL import Image
+        # ii = Image.fromarray(img.astype(np.uint8))
+        # ii.save("/home/synopsis/git/test_no_pad.jpg")
+
+        # breakpoint()
 
             
         im_height, im_width, _ = img.shape
         scale = torch.Tensor([img.shape[1], img.shape[0], img.shape[1], img.shape[0]])
+
+        # Old
         img -= (104, 117, 123)
+        # img /= (57, 57, 58) # bgr order
         img = img.transpose(2, 0, 1)
+
+        # New
+        # from blazeface.data.transform.data_augment import normalize, BGR_to_RGB, HWC_to_CHW, IMAGENET_MEAN, IMAGENET_STD
+        # img = BGR_to_RGB(img)
+        # img = normalize(img, IMAGENET_MEAN, IMAGENET_STD)
+        # img = HWC_to_CHW(img)
+
         img = torch.from_numpy(img).unsqueeze(0)
         img = img.to(device)
         scale = scale.to(device)
@@ -248,3 +286,12 @@ if __name__ == '__main__':
             name = "./results/" + str(i) + ".jpg"
             cv2.imwrite(name, img_raw)
 
+
+    os.system(
+        f"""
+    # Run evaluation
+    cd widerface_evaluate &&
+    python setup.py build_ext --inplace &&
+    python evaluation.py
+    """
+    )

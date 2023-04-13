@@ -4,6 +4,9 @@ import random
 # from utils.box_utils import matrix_iof, letterbox
 from ...utils.box_utils import matrix_iof, letterbox
 
+
+IMAGENET_MEAN, IMAGENET_STD = ([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+
 # Prevent OpenCV from multithreading (to use PyTorch DataLoader)
 cv2.setNumThreads(0)
 
@@ -189,6 +192,7 @@ def _mirror(image, boxes, landms):
 
 
 def _pad_to_square(image, rgb_mean, pad_image_flag):
+# def _pad_to_square(image, pad_image_flag):
     if not pad_image_flag:
         return image
     height, width, _ = image.shape
@@ -198,6 +202,7 @@ def _pad_to_square(image, rgb_mean, pad_image_flag):
     # image_t[:, :] = rgb_mean
     # image_t[0:0 + height, 0:0 + width] = image
 
+    # image_t, ratio, (dw, dh) = letterbox(image, (long_side, long_side), (104, 117, 123), False)
     image_t, ratio, (dw, dh) = letterbox(image, (long_side, long_side), rgb_mean, False)
    
     return image_t
@@ -211,12 +216,61 @@ def _resize_subtract_mean(image, insize, rgb_mean):
     image -= rgb_mean
     return image.transpose(2, 0, 1)
 
+def _resize_subtract_mean_div_std(image, insize, rgb_mean, rgb_std):
+    interp_methods = [cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA, cv2.INTER_NEAREST, cv2.INTER_LANCZOS4]
+    interp_method = interp_methods[random.randrange(5)]
+    image = cv2.resize(image, (insize, insize), interpolation=interp_method)
+    image = image.astype(np.float32)
+    image -= rgb_mean
+    image /= rgb_std
+    return image.transpose(2, 0, 1)
+
+
+# Adapted from icevision.utils.utils
+def normalize(img, mean, std, max_pixel_value=255):
+    """
+    If `mean` and `std` are given (expected in 0-1 range), normalises image between 0-1
+    and subtracts `mean` and divs `std`.
+    Else, the image is returned back as is in 0-255 range (but converted to np.float32)
+    """
+    img = img.astype(np.float32)
+
+    if (mean is not None) and (std is not None):
+        img /= max_pixel_value
+
+        mean, std = map(np.float32, [mean, std])
+        return (img - mean) / std
+
+    else:
+        return img
+
+
+def resize_cv2(image, insize_HW):
+    interp_methods = [
+        cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_AREA,
+        cv2.INTER_NEAREST, cv2.INTER_LANCZOS4,
+    ]
+    H, W = insize_HW
+    interp_method = interp_methods[random.randrange(5)]
+    image = cv2.resize(image, (W, H), interpolation=interp_method)
+
+    return image
+
+
+def HWC_to_CHW(image: np.ndarray) -> np.ndarray:
+    return image.transpose(2, 0, 1)
+
+
+def BGR_to_RGB(image: np.ndarray) -> np.ndarray:
+    return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
 
 class preproc(object):
 
-    def __init__(self, img_dim, rgb_means, pad_images):
+    def __init__(self, img_dim, rgb_means, rgb_std, pad_images):
         self.img_dim = img_dim
         self.rgb_means = rgb_means
+        self.rgb_std = rgb_std
         self.pad_images = pad_images
 
     def __call__(self, image, targets):
@@ -231,10 +285,23 @@ class preproc(object):
 
         if self.pad_images:
             image_t = _pad_to_square(image_t,self.rgb_means, pad_image_flag)
+            # image_t = _pad_to_square(image_t, pad_image_flag)
 
         image_t, boxes_t, landm_t = _mirror(image_t, boxes_t, landm_t)
         height, width, _ = image_t.shape
+
+        # Old
         image_t = _resize_subtract_mean(image_t, self.img_dim, self.rgb_means)
+
+        # New - simpler steps...
+        # image_t = _resize_subtract_mean_div_std(image_t, self.img_dim, self.rgb_means, self.rgb_std)
+
+        # New, where we break down the resize + normalisation into explicit steps
+        # image_t = resize_cv2(image, (self.img_dim, self.img_dim))
+        # image_t = BGR_to_RGB(image_t)
+        # image_t = normalize(image_t, self.rgb_means, self.rgb_std)
+        # image_t = HWC_to_CHW(image_t)
+
         boxes_t[:, 0::2] /= width
         boxes_t[:, 1::2] /= height
 

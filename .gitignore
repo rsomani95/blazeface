@@ -152,4 +152,8 @@ widerface_evaluate/widerface_txt/*
 data/widerface*
 weights/*
 data/FDDB
-widerface_evaluate/*
+widerface_evaluate/build
+# widerface_evaluate/ground_truth
+widerface_evaluate/widerface_txt
+# widerface_evaluate/bbox*
+# widerface_evaluate/box_overlaps.pyx
