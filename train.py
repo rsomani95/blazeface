@@ -102,11 +102,12 @@ rich.print(f"Pad Images? : {args.pad_images}")
 # rgb_mean = (104, 117, 123) # bgr order
 # rgb_std = (57, 57, 58) # bgr order
 
-rgb_mean = (123, 117, 104) # rgb order
-rgb_std = (58, 57, 57) # rgb order
+# rgb_mean = (123, 117, 104) # rgb order
+# rgb_std = (58, 57, 57) # rgb order
 
-# rgb_mean = IMAGENET_MEAN
-# rgb_std = IMAGENET_STD
+rgb_mean = IMAGENET_MEAN  # rgb order
+rgb_std = IMAGENET_STD  # rgb order
+
 num_classes = 2
 img_dim = cfg['image_size']
 num_gpu = cfg['ngpu']

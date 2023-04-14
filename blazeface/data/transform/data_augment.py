@@ -202,8 +202,9 @@ def _pad_to_square(image, rgb_mean, pad_image_flag):
     # image_t[:, :] = rgb_mean
     # image_t[0:0 + height, 0:0 + width] = image
 
-    # image_t, ratio, (dw, dh) = letterbox(image, (long_side, long_side), (104, 117, 123), False)
-    image_t, ratio, (dw, dh) = letterbox(image, (long_side, long_side), rgb_mean, False)
+    image_t, ratio, (dw, dh) = letterbox(image, (long_side, long_side), (123, 104, 117), False)  # Mean, hardcoded
+    # image_t, ratio, (dw, dh) = letterbox(image, (long_side, long_side), (0, 0, 0), False)  # Black
+    # image_t, ratio, (dw, dh) = letterbox(image, (long_side, long_side), rgb_mean, False)
    
     return image_t
 
@@ -221,6 +222,7 @@ def _resize_subtract_mean_div_std(image, insize, rgb_mean, rgb_std):
     interp_method = interp_methods[random.randrange(5)]
     image = cv2.resize(image, (insize, insize), interpolation=interp_method)
     image = image.astype(np.float32)
+    image /= 255.0
     image -= rgb_mean
     image /= rgb_std
     return image.transpose(2, 0, 1)
@@ -299,7 +301,6 @@ class preproc(object):
 
         # New, where we break down the resize + normalisation into explicit steps
         # image_t = resize_cv2(image, (self.img_dim, self.img_dim))
-        # image_t = BGR_to_RGB(image_t)
         # image_t = normalize(image_t, self.rgb_means, self.rgb_std)
         # image_t = HWC_to_CHW(image_t)
 

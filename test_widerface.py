@@ -14,7 +14,9 @@ from config import cfg_mnet, cfg_slim, cfg_rfb, cfg_blaze
 from blazeface.models.module.prior_box import PriorBox
 from blazeface.models.module.py_cpu_nms import py_cpu_nms
 import cv2
-from blazeface.data.transform.data_augment import BGR_to_RGB
+from blazeface.data.transform.data_augment import (
+    BGR_to_RGB, normalize, IMAGENET_MEAN, IMAGENET_STD, HWC_to_CHW
+)
 from pathlib import Path
 from blazeface.models.retinaface import RetinaFace
 from blazeface.models.net_slim import Slim
@@ -179,8 +181,13 @@ if __name__ == '__main__':
         # Old
         # img -= (104, 117, 123)  # BGR order
         img = BGR_to_RGB(img)
-        img -= (123, 117, 104)  # RGB order
-        img /= (58, 57, 57) # BGR order
+        # img = normalize(img, IMAGENET_MEAN, IMAGENET_STD)
+        img /= 255.0
+        # img -= (123, 117, 104)  # RGB order
+        # img /= (58, 57, 57) # BGR order
+        img -= IMAGENET_MEAN
+        img /= IMAGENET_STD
+        # img = HWC_to_CHW(img)
         img = img.transpose(2, 0, 1)
 
         # New
