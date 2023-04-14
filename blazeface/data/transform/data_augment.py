@@ -202,10 +202,8 @@ def _pad_to_square(image, rgb_mean, pad_image_flag):
     # image_t[:, :] = rgb_mean
     # image_t[0:0 + height, 0:0 + width] = image
 
-    image_t, ratio, (dw, dh) = letterbox(image, (long_side, long_side), (123, 104, 117), False)  # Mean, hardcoded
-    # image_t, ratio, (dw, dh) = letterbox(image, (long_side, long_side), (0, 0, 0), False)  # Black
-    # image_t, ratio, (dw, dh) = letterbox(image, (long_side, long_side), rgb_mean, False)
-   
+    image_t, ratio, (dw, dh) = letterbox(image, (long_side, long_side), (0, 0, 0), False)  # Black
+
     return image_t
 
 

@@ -160,7 +160,7 @@ if __name__ == '__main__':
 
         if args.pad_images:
             image_t = np.empty((im_size_max, im_size_max, 3), dtype=img.dtype)
-            image_t[:, :] = (104, 117, 123)
+            image_t[:, :] = (0, 0, 0)  # Black padding
             image_t[0:0 + height, 0:0 + width] = img
             img = cv2.resize(image_t, (max_size, max_size))
         else:
